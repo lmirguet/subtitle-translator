@@ -3,9 +3,12 @@ from __future__ import annotations
 import json
 import shutil
 import subprocess
+from collections.abc import Callable
 from pathlib import Path
 
 from subtitle_translator.models import SUPPORTED_CODEC_IDS, SubtitleFormat, SubtitleTrack, TargetLanguage
+
+Reporter = Callable[[str], None] | None
 
 
 class DependencyError(RuntimeError):
@@ -62,18 +65,26 @@ def parse_subtitle_tracks(payload: dict) -> list[SubtitleTrack]:
     return tracks
 
 
-def extract_subtitle_track(input_path: Path, track: SubtitleTrack, working_directory: Path) -> Path:
+def extract_subtitle_track(
+    input_path: Path,
+    track: SubtitleTrack,
+    working_directory: Path,
+    reporter: Reporter = None,
+) -> Path:
     if not track.is_supported:
         raise ValueError(f"Track #{track.id} is not a supported text subtitle track.")
 
     output_path = working_directory / f"track_{track.id}.{track.extracted_suffix}"
+    if reporter is not None:
+        reporter(f"Extracting subtitle track #{track.id} with mkvextract.")
     _run_tool(
         [
             "mkvextract",
             "tracks",
             str(input_path),
             f"{track.id}:{output_path}",
-        ]
+        ],
+        stream_output=True,
     )
     return output_path
 
@@ -83,8 +94,11 @@ def mux_translated_track(
     translated_subtitle_path: Path,
     target_language: TargetLanguage,
     output_path: Path,
+    reporter: Reporter = None,
 ) -> None:
     output_path.parent.mkdir(parents=True, exist_ok=True)
+    if reporter is not None:
+        reporter(f"Remuxing translated subtitles into {output_path.name} with mkvmerge.")
     _run_tool(
         [
             "mkvmerge",
@@ -98,7 +112,8 @@ def mux_translated_track(
             "--default-track-flag",
             "0:no",
             str(translated_subtitle_path),
-        ]
+        ],
+        stream_output=True,
     )
 
 
@@ -114,13 +129,22 @@ def _detect_subtitle_format(codec_id: str | None, codec: str | None) -> Subtitle
     return None
 
 
-def _run_tool(command: list[str]) -> subprocess.CompletedProcess[str]:
+def _run_tool(command: list[str], stream_output: bool = False) -> subprocess.CompletedProcess[str]:
     try:
-        result = subprocess.run(command, check=False, capture_output=True, text=True)
+        result = subprocess.run(
+            command,
+            check=False,
+            capture_output=not stream_output,
+            text=True,
+        )
     except FileNotFoundError as exc:
         raise DependencyError(f"Command not found: {command[0]}") from exc
 
     if result.returncode != 0:
-        detail = result.stderr.strip() or result.stdout.strip() or "command failed"
+        detail = result.stderr.strip() if result.stderr else ""
+        if not detail and result.stdout:
+            detail = result.stdout.strip()
+        if not detail:
+            detail = f"exit code {result.returncode}"
         raise ExternalToolError(f"{command[0]} failed: {detail}")
     return result

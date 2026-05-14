@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
@@ -7,18 +8,25 @@ from subtitle_translator import media, subtitles
 from subtitle_translator.models import SubtitleTrack, TargetLanguage, TranslationOptions
 from subtitle_translator.translation import SubtitleTranslator
 
+Reporter = Callable[[str], None] | None
+
 
 class ApplicationError(RuntimeError):
     pass
 
 
 class SubtitleTranslationApp:
+    def __init__(self, reporter: Reporter = None) -> None:
+        self.reporter = reporter
+
     def inspect_tracks(self, input_path: Path) -> list[SubtitleTrack]:
         media.ensure_mkvtoolnix_available()
+        self._report(f"Inspecting subtitle tracks in {input_path.name}.")
         return media.inspect_subtitle_tracks(input_path)
 
     def translate(self, options: TranslationOptions) -> Path:
         media.ensure_mkvtoolnix_available()
+        self._report(f"Inspecting subtitle tracks in {options.input_path.name}.")
         tracks = media.inspect_subtitle_tracks(options.input_path)
         source_track = _resolve_track(tracks, options.source_track_id)
 
@@ -30,17 +38,29 @@ class SubtitleTranslationApp:
         if not options.in_place and output_path.exists():
             raise ApplicationError(f"Output file already exists: {output_path}")
 
-        translator = SubtitleTranslator(model=options.model)
+        translator = SubtitleTranslator(model=options.model, reporter=self.reporter)
+        self._report(
+            f"Selected subtitle track #{source_track.id} ({source_track.codec}, language={source_track.language or 'unknown'})."
+        )
 
         with TemporaryDirectory(dir=options.input_path.parent) as tmp_dir:
             working_directory = Path(tmp_dir)
-            extracted_subtitle_path = media.extract_subtitle_track(options.input_path, source_track, working_directory)
+            extracted_subtitle_path = media.extract_subtitle_track(
+                options.input_path,
+                source_track,
+                working_directory,
+                reporter=self.reporter,
+            )
+            self._report(f"Parsing extracted subtitle file {extracted_subtitle_path.name}.")
             subtitle_doc = subtitles.load_subtitles(extracted_subtitle_path, source_track.format)
             segments = subtitles.collect_translatable_segments(subtitle_doc)
+            self._report(f"Loaded {len(segments)} subtitle lines from the selected track.")
             translated_texts = translator.translate_segments(segments, options.target_language, source_track)
 
             translated_subtitle_path = working_directory / f"translated.{source_track.format.value}"
+            self._report("Applying translated text to the subtitle document.")
             subtitles.apply_translations(subtitle_doc, segments, translated_texts)
+            self._report(f"Writing translated subtitles to {translated_subtitle_path.name}.")
             subtitles.save_subtitles(subtitle_doc, translated_subtitle_path, source_track.format)
 
             temp_output_path = (
@@ -48,13 +68,24 @@ class SubtitleTranslationApp:
                 if options.in_place
                 else output_path
             )
-            media.mux_translated_track(options.input_path, translated_subtitle_path, options.target_language, temp_output_path)
+            media.mux_translated_track(
+                options.input_path,
+                translated_subtitle_path,
+                options.target_language,
+                temp_output_path,
+                reporter=self.reporter,
+            )
 
             if options.in_place:
+                self._report(f"Replacing {options.input_path.name} with the translated output.")
                 temp_output_path.replace(options.input_path)
                 return options.input_path
 
         return output_path
+
+    def _report(self, message: str) -> None:
+        if self.reporter is not None:
+            self.reporter(message)
 
 
 def _resolve_track(tracks: list[SubtitleTrack], track_id: int) -> SubtitleTrack:

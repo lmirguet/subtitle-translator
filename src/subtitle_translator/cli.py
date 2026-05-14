@@ -59,7 +59,7 @@ def main(
     if input_path.suffix.lower() != ".mkv":
         raise typer.BadParameter("Input file must be an MKV file.")
 
-    app = SubtitleTranslationApp()
+    app = SubtitleTranslationApp(reporter=_log_message)
 
     try:
         tracks = app.inspect_tracks(input_path)
@@ -162,6 +162,11 @@ def _prompt_for_output_mode(output: Path | None) -> bool:
 
 def _is_interactive() -> bool:
     return sys.stdin.isatty() and sys.stdout.isatty()
+
+
+def _log_message(message: str) -> None:
+    console.print(f"[cyan]{message}[/cyan]")
+
 
 if __name__ == "__main__":
     run()
