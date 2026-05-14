@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "subtitle-translator"
+version = "0.1.0"
+description = "CLI utility to add translated subtitle tracks to MKV files."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+  "openai>=1.79.0",
+  "pydantic>=2.7.0",
+  "pysubs2>=1.7.0",
+  "questionary>=2.1.0",
+  "rich>=14.0.0",
+  "typer>=0.15.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.0.0",
+]
+
+[project.scripts]
+subtitle-translator = "subtitle_translator.cli:run"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
