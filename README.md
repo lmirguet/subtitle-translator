@@ -58,6 +58,14 @@ subtitle-translator movie.mkv --output movie.fr.translated.mkv
 subtitle-translator movie.mkv --in-place
 ```
 
+Supported target languages:
+
+- `en` English
+- `fr` French
+- `es` Spanish
+- `ru` Russian
+- `pl` Polish
+
 The default interaction is:
 
 1. Inspect the MKV subtitle tracks

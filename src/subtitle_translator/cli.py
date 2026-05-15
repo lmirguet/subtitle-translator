@@ -31,7 +31,7 @@ def main(
         typer.Option(
             "--target-lang",
             case_sensitive=False,
-            help="Target language: en, fr, es, or ru. Skip the interactive language prompt.",
+            help="Target language: en, fr, es, ru, or pl. Skip the interactive language prompt.",
         ),
     ] = None,
     output: Annotated[

@@ -10,6 +10,7 @@ class TargetLanguage(StrEnum):
     FRENCH = "fr"
     SPANISH = "es"
     RUSSIAN = "ru"
+    POLISH = "pl"
 
     @property
     def display_name(self) -> str:
@@ -18,6 +19,7 @@ class TargetLanguage(StrEnum):
             TargetLanguage.FRENCH: "French",
             TargetLanguage.SPANISH: "Spanish",
             TargetLanguage.RUSSIAN: "Russian",
+            TargetLanguage.POLISH: "Polish",
         }[self]
 
     @property
@@ -27,6 +29,7 @@ class TargetLanguage(StrEnum):
             TargetLanguage.FRENCH: "fra",
             TargetLanguage.SPANISH: "spa",
             TargetLanguage.RUSSIAN: "rus",
+            TargetLanguage.POLISH: "pol",
         }[self]
 
 
